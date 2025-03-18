@@ -19,15 +19,23 @@ orden_meses = ['January', 'February', 'March', 'April', 'May', 'June',
 # Dashboard Streamlit
 st.title("Dashboard de Ventas - Catusita")
 
+# Articulos unicos incluidos Todos
+lista_articulos = df['nombre_vendedor'].unique().tolist()
+lista_articulos.append("Todos")
+
 # Filtros interactivos
 vendedor_especifico = st.selectbox('Selecciona un vendedor:', sorted(df['nombre_vendedor'].unique()))
-articulo_especifico = st.selectbox('Selecciona un artículo:', sorted(df['articulo'].unique()))
+articulo_especifico = st.selectbox('Selecciona un artículo:', sorted(lista_articulos))
 año_especifico = st.selectbox('Selecciona un año:', sorted(df['año'].unique()))
 
 # Filtrar el DataFrame
-df_filtrado = df[(df['nombre_vendedor'] == vendedor_especifico) &
-                 (df['articulo'] == articulo_especifico) &
-                 (df['año'] == año_especifico)]
+if articulo_especifico == "Todos":
+    df_filtrado = df[(df['nombre_vendedor'] == vendedor_especifico) &
+                    (df['año'] == año_especifico)]
+else:
+        df_filtrado = df[(df['nombre_vendedor'] == vendedor_especifico) &
+                    (df['articulo'] == articulo_especifico) &
+                    (df['año'] == año_especifico)]
 
 # Tabla por fuente_suministro
 tabla_fuente = df_filtrado.pivot_table(index='fuente_suministro',
@@ -37,7 +45,7 @@ tabla_fuente = df_filtrado.pivot_table(index='fuente_suministro',
                                        fill_value=0).reindex(columns=orden_meses, fill_value=0)
 
 # Tabla por cliente
-tabla_cliente = df_filtrado.pivot_table(index='cliente',
+tabla_cliente = df_filtrado.pivot_table(index='nombre_cliente',
                                         columns='mes',
                                         values='venta_usd',
                                         aggfunc='sum',
