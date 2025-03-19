@@ -40,7 +40,12 @@ vendedor_especifico = st.selectbox('Selecciona un vendedor:', sorted(lista_vende
 
 lista_articulos = ["Todos"] + sorted(df['articulo'].unique().tolist())
 articulo_especifico = st.selectbox('Selecciona un artículo:', lista_articulos, index=0)
-año_especifico = st.selectbox('Selecciona un año:', sorted(df['año'].unique(), reverse=True))
+
+lista_fuentes = ["Todos"] + sorted(df['fuente_suministro'].astype(str).unique().tolist())
+fuente_especifica = st.selectbox('Selecciona una fuente de suministro:', lista_fuentes, index=0)
+
+lista_años = ["Todos"] + sorted(df['año'].unique(), reverse=True)
+año_especifico = st.selectbox('Selecciona un año:', lista_años)
 
 # Opciones de filtro por meses (solo un toggle activo a la vez)
 st.subheader("Filtrar por últimos meses")
@@ -61,68 +66,76 @@ with col3:
         filtro_meses = fecha_12_meses
 
 # Filtrar el DataFrame según los filtros seleccionados
-if vendedor_especifico == "Todos":
-    df_filtrado = df.copy()
-else:
-    df_filtrado = df[df['nombre_vendedor'] == vendedor_especifico]
+if vendedor_especifico != "Todos":
+    df = df[df['nombre_vendedor'] == vendedor_especifico]
 
 if articulo_especifico != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['articulo'] == articulo_especifico]
+    df = df[df['articulo'] == articulo_especifico]
+
+if fuente_especifica != "Todos":
+    df = df[df['fuente_suministro'].astype(str) == fuente_especifica]
 
 # Aplicar filtro de meses si está definido, sino usar el año seleccionado
 if filtro_meses:
-    df_filtrado = df_filtrado[df_filtrado['fecha'] >= filtro_meses]
+    df = df[df['fecha'] >= filtro_meses]
     agrupar_por = 'year-month'
-else:
-    df_filtrado = df_filtrado[df_filtrado['año'] == año_especifico]
+elif año_especifico != "Todos":
+    df = df[df['año'] == año_especifico]
     agrupar_por = 'mes'
+else:
+    agrupar_por = 'Total'
 
 # Ordenar los datos
 if agrupar_por == 'year-month':
-    df_filtrado = df_filtrado.sort_values(by='year-month', ascending=True)
-else:
+    df = df.sort_values(by='year-month', ascending=True)
+elif agrupar_por == 'mes':
     orden_meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    df_filtrado["mes"] = pd.Categorical(df_filtrado["mes"], categories=orden_meses, ordered=True)
-    df_filtrado = df_filtrado.sort_values(by="mes")
+    df["mes"] = pd.Categorical(df["mes"], categories=orden_meses, ordered=True)
+    df = df.sort_values(by="mes")
 
 # Verificar si hay datos después del filtrado
-if df_filtrado.empty:
+if df.empty:
     st.warning("No hay datos disponibles para el período seleccionado.")
 else:
     # Tabla por fuente de suministro
-    tabla_fuente = df_filtrado.pivot_table(index='fuente_suministro',
-                                           columns=agrupar_por,
-                                           values='venta_usd',
-                                           aggfunc='sum',
-                                           fill_value=0,
-                                           observed=False)
+    tabla_fuente = df.pivot_table(index='fuente_suministro',
+                                  columns=agrupar_por if agrupar_por != 'Total' else None,
+                                  values='venta_usd',
+                                  aggfunc='sum',
+                                  fill_value=0,
+                                  observed=False)
     
-    # Convertir valores a numéricos antes de sumar
-    tabla_fuente = tabla_fuente.apply(pd.to_numeric, errors='coerce')
     tabla_fuente['Total'] = tabla_fuente.sum(axis=1)
     tabla_fuente.loc['Total'] = tabla_fuente.sum()
     
-    # Tabla por cliente
-    tabla_cliente = df_filtrado.pivot_table(index='nombre_cliente',
-                                            columns=agrupar_por,
-                                            values='venta_usd',
-                                            aggfunc='sum',
-                                            fill_value=0,
-                                            observed=False)
+    # Renombrar columnas y redondear valores
+    tabla_fuente.index.name = "Fuente Suministro"
+    tabla_fuente = tabla_fuente.round(0).astype(int)
     
-    # Convertir valores a numéricos antes de sumar
-    tabla_cliente = tabla_cliente.apply(pd.to_numeric, errors='coerce')
+    # Tabla por cliente
+    tabla_cliente = df.pivot_table(index='nombre_cliente',
+                                   columns=agrupar_por if agrupar_por != 'Total' else None,
+                                   values='venta_usd',
+                                   aggfunc='sum',
+                                   fill_value=0,
+                                   observed=False)
+    
     tabla_cliente['Total'] = tabla_cliente.sum(axis=1)
     tabla_cliente.loc['Total'] = tabla_cliente.sum()
     
-    # Formatear solo después de sumar
-    tabla_fuente = tabla_fuente.map(lambda x: "{:,}".format(int(x)))
-    tabla_cliente = tabla_cliente.map(lambda x: "{:,}".format(int(x)))
+    # Renombrar columnas y redondear valores
+    tabla_cliente.index.name = "Cliente"
+    tabla_cliente = tabla_cliente.round(0).astype(int)
+    
+    # Mostrar solo la columna "Total" si el año seleccionado es "Todos"
+    if año_especifico == "Todos":
+        tabla_fuente = tabla_fuente[['Total']]
+        tabla_cliente = tabla_cliente[['Total']]
     
     # Mostrar resultados en Streamlit
     st.subheader("Tabla por Fuente de Suministro")
-    st.dataframe(tabla_fuente)
+    st.dataframe(tabla_fuente.style.set_properties(**{'text-align': 'center'}))
 
     st.subheader("Tabla por Cliente")
-    st.dataframe(tabla_cliente)
+    st.dataframe(tabla_cliente.style.set_properties(**{'text-align': 'center'}))
