@@ -3,7 +3,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 
 # Cargar el archivo CSV
-ruta_csv = "catusita_consolidated.csv"  # Ajusta esta ruta según la ubicación de tu archivo CSV
+ruta_csv = "df_sales_cleaned.csv"  # Ajusta esta ruta según la ubicación de tu archivo CSV
 df = pd.read_csv(ruta_csv)
 
 # Convertir columna 'fecha' a datetime
